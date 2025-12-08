@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home Purchase Calculator - Quebec</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="static/css/styles.css">
+</head>
+
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-6xl">
+        <!-- Header -->
+        <header class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div class="flex justify-between items-start">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-800">Home Purchase Calculator</h1>
+                    <p class="text-gray-600 mt-2">Quebec Edition - CMHC Insurance & Welcome Tax Included</p>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="exportToJson()"
+                        class="text-sm text-blue-600 hover:text-blue-800 px-3 py-1 border border-blue-300 rounded hover:border-blue-500 hover:bg-blue-50">
+                        Export JSON
+                    </button>
+                    <label class="text-sm text-green-600 hover:text-green-800 px-3 py-1 border border-green-300 rounded hover:border-green-500 hover:bg-green-50 cursor-pointer">
+                        Import JSON
+                        <input type="file" accept=".json" onchange="importFromJson(event)" class="hidden">
+                    </label>
+                    <button onclick="if(confirm('Clear all saved data and start fresh?')) clearStorage()"
+                        class="text-sm text-gray-500 hover:text-red-600 px-3 py-1 border border-gray-300 rounded hover:border-red-300">
+                        Clear Data
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+            <!-- Left Column: Inputs -->
+            <div class="space-y-6">
+
+                <!-- Property Pricing -->
+                <section class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                        <span
+                            class="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center mr-3 text-sm">1</span>
+                        Property Pricing
+                    </h2>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Asking Price ($)</label>
+                            <input type="number" id="askingPrice" class="input-field" placeholder="500,000"
+                                oninput="calculate(); saveToStorage()">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Evaluation Price ($)</label>
+                            <input type="number" id="evaluationPrice" class="input-field" placeholder="480,000"
+                                oninput="calculate(); saveToStorage()">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Offer Price ($)</label>
+                            <input type="number" id="offerPrice" class="input-field" placeholder="490,000"
+                                oninput="calculate(); saveToStorage()">
+                        </div>
+                    </div>
+                    <div class="mt-4 grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Square Footage (sqft)</label>
+                            <input type="number" id="squareFootage" class="input-field" placeholder="1,500"
+                                oninput="calculate(); saveToStorage()">
+                        </div>
+                    </div>
+                    <!-- Offer Percentages Display -->
+                    <div id="offerPercentages" class="mt-4 p-3 bg-gray-50 rounded-lg hidden">
+                        <div class="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <span class="text-gray-600">Offer vs Asking:</span>
+                                <span id="percentOfAsking" class="font-semibold ml-2">--</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-600">Offer vs Evaluation:</span>
+                                <span id="percentOfEvaluation" class="font-semibold ml-2">--</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Down Payment & CMHC -->
+                <section class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                        <span
+                            class="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center mr-3 text-sm">2</span>
+                        Down Payment & CMHC Insurance
+                    </h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Down Payment</label>
+                            <div class="flex gap-2">
+                                <input type="number" id="downPayment" class="input-field flex-grow" placeholder="50,000"
+                                    oninput="onDownPaymentChange('amount')">
+                                <div class="flex border border-gray-300 rounded-md overflow-hidden">
+                                    <button id="downPaymentModeAmount" onclick="setDownPaymentMode('amount')"
+                                        class="px-3 py-2 text-sm bg-blue-500 text-white">$</button>
+                                    <button id="downPaymentModePercent" onclick="setDownPaymentMode('percent')"
+                                        class="px-3 py-2 text-sm bg-gray-100 text-gray-700 hover:bg-gray-200">%</button>
+                                </div>
+                            </div>
+                            <div id="downPaymentConverted" class="text-xs text-gray-500 mt-1"></div>
+                        </div>
+                        <div class="flex items-end">
+                            <label class="flex items-center">
+                                <input type="checkbox" id="is30Year" class="w-4 h-4 text-blue-600 rounded"
+                                    onchange="calculate(); saveToStorage()">
+                                <span class="ml-2 text-sm text-gray-700">30-year amortization (first-time buyer)</span>
+                            </label>
+                        </div>
+                    </div>
+                    <!-- CMHC Display -->
+                    <div id="cmhcDisplay" class="mt-4 p-4 bg-blue-50 rounded-lg hidden">
+                        <h3 class="font-semibold text-blue-800 mb-2">CMHC Insurance Details</h3>
+                        <div class="grid grid-cols-2 gap-2 text-sm">
+                            <div><span class="text-gray-600">Down Payment:</span> <span id="downPaymentPercent"
+                                    class="font-medium">--</span></div>
+                            <div><span class="text-gray-600">LTV Ratio:</span> <span id="ltvRatio"
+                                    class="font-medium">--</span></div>
+                            <div><span class="text-gray-600">Premium Rate:</span> <span id="premiumRate"
+                                    class="font-medium">--</span></div>
+                            <div><span class="text-gray-600">CMHC Premium:</span> <span id="cmhcPremium"
+                                    class="font-medium">--</span></div>
+                            <div><span class="text-gray-600">Quebec Tax (TVQ):</span> <span id="quebecTax"
+                                    class="font-medium">--</span></div>
+                            <div><span class="text-gray-600">Total CMHC Cost:</span> <span id="totalCmhc"
+                                    class="font-semibold text-blue-700">--</span></div>
+                        </div>
+                        <div class="mt-2 pt-2 border-t border-blue-200">
+                            <span class="text-gray-600">Total Mortgage:</span> <span id="totalMortgage"
+                                class="font-bold text-blue-800 ml-2">--</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Financing Sources -->
+                <section class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                        <span
+                            class="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center mr-3 text-sm">3</span>
+                        Financing Sources
+                        <button onclick="addFinancingSource()"
+                            class="ml-auto bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600">
+                            + Add Source
+                        </button>
+                    </h2>
+                    <div id="financingSources" class="space-y-4">
+                        <!-- Financing sources will be added here dynamically -->
+                    </div>
+                </section>
+
+                <!-- Monthly Costs -->
+                <section class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                        <span
+                            class="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center mr-3 text-sm">4</span>
+                        Monthly Recurring Costs
+                    </h2>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Insurance ($/mo)</label>
+                            <input type="number" id="insurance" class="input-field" placeholder="150"
+                                oninput="calculate(); saveToStorage()">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Electricity ($/mo)</label>
+                            <input type="number" id="electricity" class="input-field" placeholder="150"
+                                oninput="calculate(); saveToStorage()">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Upkeep ($/mo)</label>
+                            <input type="number" id="upkeep" class="input-field" placeholder="200"
+                                oninput="calculate(); saveToStorage()">
+                            <button onclick="suggestUpkeep()" class="text-xs text-blue-600 hover:underline mt-1">Suggest
+                                (1% rule)</button>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">City Taxes ($/year)</label>
+                            <input type="number" id="cityTaxes" class="input-field" placeholder="4,000"
+                                oninput="calculate(); saveToStorage()">
+                            <span id="cityTaxesMonthly" class="text-xs text-gray-500"></span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- One-Time Costs -->
+                <section class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                        <span
+                            class="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center mr-3 text-sm">5</span>
+                        One-Time Costs
+                    </h2>
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Notary Fees ($)</label>
+                            <input type="number" id="notaryFees" class="input-field" value="1800"
+                                oninput="calculate(); saveToStorage()">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Welcome Tax</label>
+                            <div id="welcomeTaxDisplay" class="input-field bg-gray-100 cursor-not-allowed">$0</div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Base Moving ($)</label>
+                            <input type="number" id="movingBase" class="input-field" placeholder="1,500"
+                                oninput="calculate(); saveToStorage()">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Paint $/sqft</label>
+                            <input type="number" id="paintPerSqft" class="input-field" value="3" step="0.5"
+                                oninput="calculate(); saveToStorage()">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Paint Total</label>
+                            <div id="paintTotal" class="input-field bg-gray-100 cursor-not-allowed">$0</div>
+                        </div>
+                    </div>
+
+                    <!-- Renovations -->
+                    <div class="mt-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="font-medium text-gray-700">Renovations</h3>
+                            <button onclick="addRenovation()"
+                                class="bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm hover:bg-gray-300">
+                                + Add Item
+                            </button>
+                        </div>
+                        <div id="renovations" class="space-y-2">
+                            <!-- Renovation items added here -->
+                        </div>
+                    </div>
+
+                    <!-- One-Time Total -->
+                    <div id="oneTimeTotalDisplay" class="mt-4 p-3 bg-orange-50 rounded-lg">
+                        <span class="text-gray-700 font-medium">Total One-Time Costs:</span>
+                        <span id="oneTimeTotal" class="font-bold text-orange-700 ml-2">$0</span>
+                    </div>
+                </section>
+
+                <!-- Household Members (Income & Debts) -->
+                <section class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                        <span
+                            class="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center mr-3 text-sm">6</span>
+                        Household Members
+                        <button onclick="addOwner()"
+                            class="ml-auto bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600">
+                            + Add Person
+                        </button>
+                    </h2>
+                    <p class="text-sm text-gray-600 mb-4">Enter income and debts for each person. GDS/TDS ratios are calculated per person based on their share of housing costs and their individual debts.</p>
+                    <div id="owners" class="space-y-4">
+                        <!-- Owners will be added here dynamically -->
+                    </div>
+                    <div class="mt-4 p-3 bg-green-50 rounded-lg">
+                        <div class="flex justify-between">
+                            <span class="text-gray-700 font-medium">Total Gross Monthly Income:</span>
+                            <span id="totalIncome" class="font-bold text-green-700">$0</span>
+                        </div>
+                        <div class="flex justify-between mt-2">
+                            <span class="text-gray-700 font-medium">Total Other Debt Payments:</span>
+                            <span id="totalOtherDebtPayments" class="font-bold text-purple-700">$0/mo</span>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+
+            <!-- Right Column: Results -->
+            <div class="space-y-6">
+
+                <!-- Affordability Analysis -->
+                <section class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4">Affordability Analysis</h2>
+
+                    <!-- Summary Cards -->
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <div class="p-3 bg-gray-50 rounded-lg">
+                            <div class="text-sm text-gray-600">Monthly Costs</div>
+                            <div id="totalMonthlyCosts" class="text-xl font-bold text-gray-800">$0</div>
+                        </div>
+                        <div class="p-3 bg-gray-50 rounded-lg">
+                            <div class="text-sm text-gray-600">Gross Income</div>
+                            <div id="totalGrossIncome" class="text-xl font-bold text-gray-800">$0</div>
+                        </div>
+                    </div>
+
+                    <!-- Housing Cost Ratio (30% Rule) - Household -->
+                    <div class="mb-6">
+                        <div class="flex justify-between items-baseline mb-2">
+                            <h3 class="text-sm font-semibold text-gray-700">Housing Cost Ratio <span class="text-xs font-normal text-gray-500">(Household)</span></h3>
+                            <div class="flex items-baseline gap-2">
+                                <span id="housingCostPercent" class="text-2xl font-bold text-gray-800">0%</span>
+                                <span id="housingCostStatus"
+                                    class="px-2 py-1 rounded-full text-xs font-medium bg-gray-200 text-gray-700">-</span>
+                            </div>
+                        </div>
+                        <div class="relative h-8 bg-gray-200 rounded-full overflow-hidden">
+                            <!-- Color zones -->
+                            <div class="absolute inset-0 flex">
+                                <div class="bg-green-400" style="width: 30%"></div>
+                                <div class="bg-yellow-400" style="width: 10%"></div>
+                                <div class="bg-red-400" style="width: 60%"></div>
+                            </div>
+                            <!-- Fill indicator -->
+                            <div id="housingCostFill"
+                                class="absolute inset-y-0 left-0 bg-gradient-to-r from-gray-700 to-gray-800 transition-all duration-500 ease-out"
+                                style="width: 0%"></div>
+                            <!-- Threshold markers -->
+                            <div class="absolute inset-0 flex items-center">
+                                <div class="absolute left-[30%] h-full w-0.5 bg-white opacity-50"></div>
+                                <div class="absolute left-[40%] h-full w-0.5 bg-white opacity-50"></div>
+                            </div>
+                        </div>
+                        <div class="flex justify-between text-xs text-gray-500 mt-1">
+                            <span>0%</span>
+                            <span class="text-green-700">30%</span>
+                            <span class="text-yellow-700">40%</span>
+                            <span>100%</span>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2">Monthly housing costs ÷ gross income. Recommended: ≤30%</p>
+                    </div>
+
+                    <!-- Per-Person GDS/TDS Ratios -->
+                    <div id="perPersonRatios" class="space-y-6">
+                        <!-- Per-person ratio cards will be added here dynamically -->
+                    </div>
+
+                    <p class="text-xs text-gray-500 mt-6 p-3 bg-blue-50 rounded-lg">
+                        <strong>Note:</strong> GDS/TDS ratios are calculated per person. Each person's share of housing costs is proportional to their income contribution. Individual debts only affect that person's TDS.
+                    </p>
+                </section>
+
+                <!-- Payment Breakdown Chart -->
+                <section class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4">Monthly Payment Breakdown (30 Years)</h2>
+                    <div class="h-96">
+                        <canvas id="paymentChart"></canvas>
+                    </div>
+                    <div id="paymentLegend" class="mt-4 grid grid-cols-2 gap-2 text-sm">
+                        <!-- Legend items added by JS -->
+                    </div>
+                </section>
+
+                <!-- Warnings & Important Notes -->
+                <section id="warningsDisplay" class="bg-white rounded-lg shadow-md p-6 hidden">
+                    <!-- Content populated by updateWarningsDisplay() -->
+                </section>
+
+                <!-- Equity Progression Chart -->
+                <section class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4">Equity Progression</h2>
+                    <div class="h-96">
+                        <canvas id="equityChart"></canvas>
+                    </div>
+                    <div id="equityLegend" class="mt-4 p-3 bg-gray-50 rounded-lg">
+                        <div class="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <span class="text-gray-600">Initial Equity (Down Payment):</span>
+                                <span id="initialEquity" class="font-medium ml-2">$0</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-600">Final Equity (after all loans):</span>
+                                <span id="finalEquity" class="font-medium ml-2">$0</span>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-3">
+                        Equity = Property Value - Remaining Loan Balances. This chart assumes property value remains constant.
+                    </p>
+                </section>
+
+                <!-- Summary -->
+                <section class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4">Summary</h2>
+                    <div class="space-y-3">
+                        <div class="flex justify-between py-2 border-b">
+                            <span class="text-gray-600">Purchase Price</span>
+                            <span id="summaryPurchasePrice" class="font-medium">$0</span>
+                        </div>
+                        <div class="flex justify-between py-2 border-b">
+                            <span class="text-gray-600">Down Payment</span>
+                            <span id="summaryDownPayment" class="font-medium">$0</span>
+                        </div>
+                        <div class="flex justify-between py-2 border-b">
+                            <span class="text-gray-600">CMHC Insurance</span>
+                            <span id="summaryCmhc" class="font-medium">$0</span>
+                        </div>
+                        <div class="flex justify-between py-2 border-b">
+                            <span class="text-gray-600">Total Mortgage</span>
+                            <span id="summaryMortgage" class="font-bold">$0</span>
+                        </div>
+                        <div class="flex justify-between py-2 border-b">
+                            <span class="text-gray-600">One-Time Costs</span>
+                            <span id="summaryOneTime" class="font-medium">$0</span>
+                        </div>
+                        <div class="flex justify-between py-2 border-b bg-blue-50 -mx-6 px-6">
+                            <span class="text-gray-800 font-semibold">Total Cash Needed</span>
+                            <span id="summaryTotalCash" class="font-bold text-blue-700">$0</span>
+                        </div>
+                        <div class="flex justify-between py-2">
+                            <span class="text-gray-600">Monthly Payment (All Loans)</span>
+                            <span id="summaryMonthlyLoan" class="font-medium">$0</span>
+                        </div>
+                        <div class="flex justify-between py-2 bg-green-50 -mx-6 px-6">
+                            <span class="text-gray-800 font-semibold">Total Monthly Costs</span>
+                            <span id="summaryMonthlyTotal" class="font-bold text-green-700">$0</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Formulas Section -->
+                <section class="bg-white rounded-lg shadow-md p-6">
+                    <button onclick="toggleFormulas()"
+                        class="w-full flex items-center justify-between text-xl font-semibold text-gray-800">
+                        <span>Formulas & Calculations</span>
+                        <svg id="formulasChevron" class="w-6 h-6 transform transition-transform" fill="none"
+                            stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                    <div id="formulasContent" class="hidden mt-4 space-y-4">
+                        <!-- Formulas will be loaded here -->
+                    </div>
+                </section>
+
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="mt-8 text-center text-gray-500 text-sm">
+            <p>Home Purchase Calculator - Quebec Edition</p>
+            <p class="mt-1">CMHC rates and Quebec welcome tax brackets as of 2024</p>
+        </footer>
+    </div>
+
+    <script src="static/js/app.js"></script>
+</body>
+
+</html>
