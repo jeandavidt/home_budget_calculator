@@ -229,6 +229,82 @@ button {
 }
 
 /* =============================================================================
+   SCENARIO TABS
+   ============================================================================= */
+
+.scenario-tab {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    background-color: #f3f4f6;
+    color: #4b5563;
+    cursor: move;
+    transition: all 0.15s ease-in-out;
+    min-width: 120px;
+    border-left: 3px solid transparent;
+}
+
+.scenario-tab:hover {
+    background-color: #e5e7eb;
+}
+
+.scenario-tab-active {
+    background-color: #3b82f6;
+    color: white;
+    font-weight: 600;
+}
+
+.scenario-tab-active:hover {
+    background-color: #2563eb;
+}
+
+.scenario-tab-add {
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    background-color: #10b981;
+    color: white;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+    font-weight: 500;
+}
+
+.scenario-tab-add:hover {
+    background-color: #059669;
+}
+
+.scenario-label-text {
+    cursor: pointer;
+    user-select: none;
+}
+
+.scenario-label-input {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: inherit;
+    font-weight: inherit;
+    padding: 0.25rem 0.5rem;
+    outline: none;
+    width: 100%;
+    border-radius: 0.25rem;
+}
+
+.scenario-label-input:focus {
+    background-color: rgba(255, 255, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.comparison-tab {
+    background-color: #f59e0b;
+    color: white;
+}
+
+.comparison-tab:hover {
+    background-color: #d97706;
+}
+
+/* =============================================================================
    ACCESSIBILITY
    ============================================================================= */
 

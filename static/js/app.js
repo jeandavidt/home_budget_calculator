@@ -106,6 +106,11 @@ let paymentChart = null;
 let equityChart = null;
 let downPaymentMode = 'amount'; // 'amount' or 'percent'
 
+// Scenario management
+let scenarios = [];
+let currentScenarioIndex = 0;
+let scenarioResults = {}; // Stores calculation results for each scenario
+
 const STORAGE_KEY = 'homeBudgetCalculator';
 
 // =============================================================================
@@ -135,10 +140,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Add initial owner
         addOwner('Person 1');
+
+        // Add default scenario
+        addScenario(500000, 'CA$500,000');
     } else if (loadedFromUrl) {
         // URL data was saved to localStorage, now load it into UI
         loadFromStorage();
     }
+
+    // Ensure at least one scenario exists
+    if (scenarios.length === 0) {
+        addScenario(getInputValue('offerPrice') || 500000);
+    }
+
+    // Render scenario tabs
+    renderScenarioTabs();
 
     // Initial calculation
     calculate();
@@ -1489,6 +1505,414 @@ function suggestUpkeep() {
 }
 
 // =============================================================================
+// SCENARIO MANAGEMENT FUNCTIONS
+// =============================================================================
+
+function addScenario(savedOfferPrice = null, savedLabel = null) {
+    const offerPrice = savedOfferPrice || getInputValue('offerPrice') || 500000;
+    const label = savedLabel || formatCurrency(offerPrice);
+
+    scenarios.push({ offerPrice, label });
+
+    renderScenarioTabs();
+    saveToStorage();
+}
+
+function removeScenario(index) {
+    if (scenarios.length <= 1) {
+        alert('You must have at least one scenario.');
+        return;
+    }
+
+    scenarios.splice(index, 1);
+    delete scenarioResults[index];
+
+    // Adjust current index if needed
+    if (currentScenarioIndex >= scenarios.length) {
+        currentScenarioIndex = scenarios.length - 1;
+    }
+
+    renderScenarioTabs();
+    switchToScenario(currentScenarioIndex);
+    saveToStorage();
+}
+
+function switchToScenario(index) {
+    if (index === 'comparison') {
+        currentScenarioIndex = 'comparison';
+        showComparisonView();
+        renderScenarioTabs();
+        return;
+    }
+
+    currentScenarioIndex = index;
+
+    // Set the offer price from the scenario
+    document.getElementById('offerPrice').value = scenarios[index].offerPrice;
+
+    // Hide comparison view, show regular view
+    document.getElementById('comparisonView').classList.add('hidden');
+    document.getElementById('regularView').classList.remove('hidden');
+
+    // Recalculate with the new offer price
+    calculate();
+
+    renderScenarioTabs();
+}
+
+function updateScenarioLabel(index, newLabel) {
+    scenarios[index].label = newLabel;
+    renderScenarioTabs();
+    saveToStorage();
+}
+
+function editScenarioLabel(index) {
+    const labelSpan = document.getElementById(`scenario-label-${index}`);
+    const labelInput = document.getElementById(`scenario-input-${index}`);
+
+    if (labelSpan && labelInput) {
+        labelSpan.classList.add('hidden');
+        labelInput.classList.remove('hidden');
+        labelInput.focus();
+        labelInput.select();
+    }
+}
+
+function finishEditingScenarioLabel(index) {
+    const labelSpan = document.getElementById(`scenario-label-${index}`);
+    const labelInput = document.getElementById(`scenario-input-${index}`);
+
+    if (labelSpan && labelInput) {
+        const newLabel = labelInput.value.trim();
+        if (newLabel !== '') {
+            scenarios[index].label = newLabel;
+            labelSpan.textContent = newLabel;
+        } else {
+            labelInput.value = scenarios[index].label;
+        }
+
+        labelInput.classList.add('hidden');
+        labelSpan.classList.remove('hidden');
+        saveToStorage();
+    }
+}
+
+function updateCurrentScenarioPrice() {
+    if (currentScenarioIndex !== 'comparison' && scenarios[currentScenarioIndex]) {
+        const newPrice = getInputValue('offerPrice');
+        scenarios[currentScenarioIndex].offerPrice = newPrice;
+        saveToStorage();
+    }
+}
+
+function renderScenarioTabs() {
+    const container = document.getElementById('scenarioTabs');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    // Render scenario tabs
+    scenarios.forEach((scenario, index) => {
+        const tab = document.createElement('div');
+        tab.className = currentScenarioIndex === index
+            ? 'scenario-tab scenario-tab-active'
+            : 'scenario-tab';
+
+        // Make tabs draggable
+        tab.draggable = true;
+        tab.dataset.index = index;
+
+        tab.innerHTML = `
+            <div class="flex items-center gap-2 flex-1" onclick="switchToScenario(${index})">
+                <span class="drag-handle" style="cursor: grab; margin-right: 0.5rem; color: #9ca3af;">⋮⋮</span>
+                <span id="scenario-label-${index}" class="scenario-label-text" ondblclick="event.stopPropagation(); editScenarioLabel(${index})">${scenario.label}</span>
+                <input
+                    type="text"
+                    id="scenario-input-${index}"
+                    value="${scenario.label}"
+                    class="scenario-label-input hidden"
+                    onclick="event.stopPropagation()"
+                    onkeydown="if(event.key === 'Enter') { this.blur(); }"
+                    onblur="finishEditingScenarioLabel(${index})"
+                />
+            </div>
+            ${scenarios.length > 1 ? `
+                <button onclick="event.stopPropagation(); removeScenario(${index})"
+                        class="text-red-500 hover:text-red-700 ml-2">
+                    ×
+                </button>
+            ` : ''}
+        `;
+
+        // Add drag event listeners
+        tab.addEventListener('dragstart', handleDragStart);
+        tab.addEventListener('dragover', handleDragOver);
+        tab.addEventListener('drop', handleDrop);
+        tab.addEventListener('dragend', handleDragEnd);
+
+        container.appendChild(tab);
+    });
+
+    // Add "+" button
+    const addButton = document.createElement('button');
+    addButton.className = 'scenario-tab-add';
+    addButton.innerHTML = '+ Add Scenario';
+    addButton.onclick = () => addScenario();
+    container.appendChild(addButton);
+
+    // Add comparison tab
+    const comparisonTab = document.createElement('div');
+    comparisonTab.className = currentScenarioIndex === 'comparison'
+        ? 'scenario-tab scenario-tab-active comparison-tab'
+        : 'scenario-tab comparison-tab';
+    comparisonTab.innerHTML = '<div onclick="switchToScenario(\'comparison\')">Compare All</div>';
+    container.appendChild(comparisonTab);
+}
+
+function showComparisonView() {
+    // Calculate all scenarios
+    const currentOfferPrice = getInputValue('offerPrice');
+
+    scenarios.forEach((scenario, index) => {
+        // Temporarily set offer price to calculate
+        document.getElementById('offerPrice').value = scenario.offerPrice;
+
+        // Store the calculation results
+        scenarioResults[index] = performCalculation();
+    });
+
+    // Restore original offer price
+    document.getElementById('offerPrice').value = currentOfferPrice;
+
+    // Render comparison table
+    renderComparisonTable();
+
+    // Show comparison view, hide regular view
+    document.getElementById('comparisonView').classList.remove('hidden');
+    document.getElementById('regularView').classList.add('hidden');
+}
+
+// =============================================================================
+// DRAG AND DROP HANDLERS FOR SCENARIO REORDERING
+// =============================================================================
+
+let draggedScenarioIndex = null;
+
+function handleDragStart(e) {
+    draggedScenarioIndex = parseInt(e.currentTarget.dataset.index);
+    e.currentTarget.style.opacity = '0.4';
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', e.currentTarget.innerHTML);
+}
+
+function handleDragOver(e) {
+    if (e.preventDefault) {
+        e.preventDefault();
+    }
+    e.dataTransfer.dropEffect = 'move';
+
+    // Add visual feedback
+    const target = e.currentTarget;
+    if (target.classList.contains('scenario-tab')) {
+        target.style.borderLeft = '3px solid #3b82f6';
+    }
+
+    return false;
+}
+
+function handleDrop(e) {
+    if (e.stopPropagation) {
+        e.stopPropagation();
+    }
+
+    const dropIndex = parseInt(e.currentTarget.dataset.index);
+
+    if (draggedScenarioIndex !== null && draggedScenarioIndex !== dropIndex) {
+        // Reorder the scenarios array
+        const draggedScenario = scenarios[draggedScenarioIndex];
+        scenarios.splice(draggedScenarioIndex, 1);
+        scenarios.splice(dropIndex, 0, draggedScenario);
+
+        // Update current scenario index if needed
+        if (currentScenarioIndex === draggedScenarioIndex) {
+            currentScenarioIndex = dropIndex;
+        } else if (draggedScenarioIndex < currentScenarioIndex && dropIndex >= currentScenarioIndex) {
+            currentScenarioIndex--;
+        } else if (draggedScenarioIndex > currentScenarioIndex && dropIndex <= currentScenarioIndex) {
+            currentScenarioIndex++;
+        }
+
+        // Re-render tabs
+        renderScenarioTabs();
+        saveToStorage();
+    }
+
+    // Remove visual feedback
+    e.currentTarget.style.borderLeft = '';
+
+    return false;
+}
+
+function handleDragEnd(e) {
+    e.currentTarget.style.opacity = '1';
+
+    // Remove all visual feedback
+    document.querySelectorAll('.scenario-tab').forEach(tab => {
+        tab.style.borderLeft = '';
+    });
+}
+
+function renderComparisonTable() {
+    const table = document.querySelector('#comparisonView table');
+    const tbody = document.getElementById('comparisonTableBody');
+    if (!table || !tbody) return;
+
+    // Update table header with scenario columns
+    const thead = table.querySelector('thead tr');
+    thead.innerHTML = `
+        <th class="px-4 py-2 text-left font-semibold text-gray-700 border-b">Metric</th>
+        ${scenarios.map(scenario => `
+            <th class="px-4 py-2 text-right font-semibold text-gray-700 border-b">${scenario.label}</th>
+        `).join('')}
+    `;
+
+    tbody.innerHTML = '';
+
+    // Define metrics to compare
+    const metrics = [
+        { label: 'Offer Price', key: 'offerPrice', format: 'currency' },
+        { label: 'Down Payment Needed', key: 'downPaymentAmount', format: 'currency' },
+        { label: 'Mortgage Amount', key: 'totalMortgage', format: 'currency' },
+        { label: 'Monthly Mortgage Payment', key: 'mortgagePayment', format: 'currency' },
+        { label: 'Monthly RRSP Repayment', key: 'rrspRepayment', format: 'currency' },
+        { label: 'Monthly Parent\'s Loan Payment', key: 'parentsLoanPayment', format: 'currency' },
+        { label: 'Total Monthly Payment', key: 'totalMonthlyPayment', format: 'currency' },
+        { label: 'Housing Cost Ratio', key: 'housingCostRatio', format: 'percent' }
+    ];
+
+    metrics.forEach(metric => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="px-4 py-2 font-medium text-gray-700 border-b">${metric.label}</td>
+            ${scenarios.map((_, index) => {
+                const result = scenarioResults[index];
+                let value = '';
+
+                if (result && result[metric.key] !== undefined && !isNaN(result[metric.key])) {
+                    if (metric.format === 'currency') {
+                        value = formatCurrency(result[metric.key]);
+                    } else if (metric.format === 'percent') {
+                        value = result[metric.key].toFixed(1) + '%';
+                    } else {
+                        value = result[metric.key];
+                    }
+                } else {
+                    value = '—';  // Em dash for missing/invalid values
+                }
+
+                // Add color coding for affordability ratio
+                let cellClass = 'px-4 py-2 border-b text-right';
+                if (metric.key === 'housingCostRatio' && result && !isNaN(result[metric.key])) {
+                    const ratio = result[metric.key];
+                    if (ratio <= 30) cellClass += ' text-green-600 font-semibold';
+                    else if (ratio <= 40) cellClass += ' text-yellow-600 font-semibold';
+                    else cellClass += ' text-red-600 font-semibold';
+                }
+
+                return `<td class="${cellClass}">${value}</td>`;
+            }).join('')}
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+function performCalculation() {
+    // This function performs the calculation and returns key results
+    // without updating the UI
+    const offerPrice = getInputValue('offerPrice');
+    const downPaymentAmount = getDownPaymentAmount();
+    const is30Year = document.getElementById('is30Year')?.checked || false;
+
+    // Calculate CMHC
+    const cmhcResult = calculateCmhc(offerPrice, downPaymentAmount, is30Year);
+
+    // Process financing sources to get monthly payments
+    let mortgagePayment = 0;
+    let rrspRepayment = 0;
+    let parentsLoanPayment = 0;
+
+    financingSources.forEach((source, index) => {
+        if (!source) return;
+
+        const sourceType = source.sourceType;
+        const typeConfig = FINANCING_TYPES[sourceType];
+
+        if (sourceType === 'mortgage' && source.isAutoFillMortgage) {
+            const amount = cmhcResult.totalMortgage || 0;
+            const rate = getInputValue(`financing-rate-${index}`);
+            const termYears = getInputValue(`financing-term-${index}`);
+            const termMonths = termYears * 12;
+            const result = calculateMonthlyPayment(amount, rate, termMonths);
+            mortgagePayment = result.monthlyPayment || 0;
+        } else if (sourceType === 'parents_loan' && source.isAutoCalculated) {
+            // First need to calculate the parent's loan amount
+            // Read all savings that count toward down payment
+            let totalSavingsForDownPayment = 0;
+            financingSources.forEach((s, i) => {
+                if (!s) return;
+                const sType = s.sourceType;
+                const sConfig = FINANCING_TYPES[sType];
+                if (sConfig && sConfig.countsTowardDownPayment && !sConfig.isAutoCalculated) {
+                    const sAmount = getInputValue(`financing-amount-${i}`);
+                    totalSavingsForDownPayment += sAmount;
+                }
+            });
+            const downPaymentGap = Math.max(0, downPaymentAmount - totalSavingsForDownPayment);
+
+            if (downPaymentGap > 0) {
+                const rate = getInputValue(`financing-rate-${index}`);
+                const termYears = getInputValue(`financing-term-${index}`);
+                const termMonths = termYears * 12;
+                const result = calculateMonthlyPayment(downPaymentGap, rate, termMonths);
+                parentsLoanPayment = result.monthlyPayment || 0;
+            }
+        } else if (sourceType === 'rrsp') {
+            const amount = getInputValue(`financing-amount-${index}`);
+            rrspRepayment = (amount / 15) / 12;
+        }
+    });
+
+    // Calculate recurring costs
+    const insurance = getInputValue('insurance');
+    const electricity = getInputValue('electricity');
+    const upkeep = getInputValue('upkeep');
+    const cityTax = getInputValue('cityTax');
+    const recurringCosts = insurance + electricity + upkeep + cityTax;
+
+    const totalMonthlyPayment = mortgagePayment + rrspRepayment + parentsLoanPayment + recurringCosts;
+
+    // Calculate affordability ratio
+    const totalMonthlyIncome = owners.filter(o => o !== null).reduce((sum, owner) => {
+        return sum + (parseFloat(owner.income) || 0);
+    }, 0);
+
+    const housingCostRatio = totalMonthlyIncome > 0
+        ? (totalMonthlyPayment / totalMonthlyIncome) * 100
+        : 0;
+
+    return {
+        offerPrice,
+        downPaymentAmount,
+        totalMortgage: cmhcResult.totalMortgage,
+        mortgagePayment,
+        rrspRepayment,
+        parentsLoanPayment,
+        totalMonthlyPayment,
+        housingCostRatio
+    };
+}
+
+// =============================================================================
 // DOWN PAYMENT MODE FUNCTIONS
 // =============================================================================
 
@@ -1617,7 +2041,14 @@ function saveToStorage() {
         renovations: renovations.filter(r => r !== null).map(r => ({
             description: r.description,
             amount: r.amount
-        }))
+        })),
+
+        // Scenarios
+        scenarios: scenarios.map(s => ({
+            offerPrice: s.offerPrice,
+            label: s.label
+        })),
+        currentScenarioIndex: currentScenarioIndex
     };
 
     try {
@@ -1700,6 +2131,18 @@ function loadFromStorage() {
             });
         }
 
+        // Scenarios
+        if (data.scenarios && data.scenarios.length > 0) {
+            scenarios = [];
+            data.scenarios.forEach(scenario => {
+                scenarios.push({
+                    offerPrice: scenario.offerPrice,
+                    label: scenario.label
+                });
+            });
+            currentScenarioIndex = data.currentScenarioIndex || 0;
+        }
+
         return true;
     } catch (e) {
         console.warn('Failed to load from localStorage:', e);
@@ -1766,6 +2209,13 @@ function getStateData() {
             description: r.description,
             amount: r.amount
         })),
+
+        // Scenarios
+        scenarios: scenarios.map(s => ({
+            offerPrice: s.offerPrice,
+            label: s.label
+        })),
+        currentScenarioIndex: currentScenarioIndex,
 
         // Metadata
         version: '1.0'
