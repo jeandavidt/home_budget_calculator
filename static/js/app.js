@@ -1886,10 +1886,34 @@ function performCalculation() {
     const insurance = getInputValue('insurance');
     const electricity = getInputValue('electricity');
     const upkeep = getInputValue('upkeep');
-    const cityTax = getInputValue('cityTax');
-    const recurringCosts = insurance + electricity + upkeep + cityTax;
+    const cityTaxesAnnual = getInputValue('cityTaxes');
+    const cityTaxesMonthly = cityTaxesAnnual / 12;
+    const recurringCosts = insurance + electricity + upkeep + cityTaxesMonthly;
 
-    const totalMonthlyPayment = mortgagePayment + rrspRepayment + parentsLoanPayment + recurringCosts;
+    // Also need to include all other loan payments
+    // NOTE: RRSP repayment is NOT included here to match the main calculate() function
+    // RRSP repayment is tracked separately but not included in monthly costs
+    let totalLoanPayments = mortgagePayment + parentsLoanPayment;
+
+    // Add other loans (not mortgage, not parent's loan, not RRSP)
+    financingSources.forEach((source, index) => {
+        if (!source) return;
+        const sourceType = source.sourceType;
+        const typeConfig = FINANCING_TYPES[sourceType];
+
+        if (typeConfig && typeConfig.isLoan && sourceType !== 'mortgage' && sourceType !== 'parents_loan') {
+            const amount = getInputValue(`financing-amount-${index}`);
+            if (amount > 0) {
+                const rate = getInputValue(`financing-rate-${index}`);
+                const termYears = getInputValue(`financing-term-${index}`);
+                const termMonths = termYears * 12;
+                const result = calculateMonthlyPayment(amount, rate, termMonths);
+                totalLoanPayments += result.monthlyPayment || 0;
+            }
+        }
+    });
+
+    const totalMonthlyPayment = totalLoanPayments + recurringCosts;
 
     // Calculate affordability ratio
     const totalMonthlyIncome = owners.filter(o => o !== null).reduce((sum, owner) => {
