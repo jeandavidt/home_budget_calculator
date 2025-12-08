@@ -7,6 +7,7 @@
     <title>Home Purchase Calculator - Quebec</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js"></script>
     <link rel="stylesheet" href="static/css/styles.css">
 </head>
 
@@ -19,7 +20,11 @@
                     <h1 class="text-3xl font-bold text-gray-800">Home Purchase Calculator</h1>
                     <p class="text-gray-600 mt-2">Quebec Edition - CMHC Insurance & Welcome Tax Included</p>
                 </div>
-                <div class="flex gap-2">
+                <div class="flex gap-2 flex-wrap justify-end">
+                    <button onclick="copyShareUrl()" id="shareUrlBtn"
+                        class="text-sm text-purple-600 hover:text-purple-800 px-3 py-1 border border-purple-300 rounded hover:border-purple-500 hover:bg-purple-50">
+                        Share URL
+                    </button>
                     <button onclick="exportToJson()"
                         class="text-sm text-blue-600 hover:text-blue-800 px-3 py-1 border border-blue-300 rounded hover:border-blue-500 hover:bg-blue-50">
                         Export JSON

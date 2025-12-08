@@ -120,8 +120,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Load and display formulas
     loadFormulas();
 
+    // Priority: URL params > localStorage > defaults
+    const loadedFromUrl = loadFromUrl();
+
     // Try to load saved data, or initialize with defaults
-    if (!loadFromStorage()) {
+    if (!loadedFromUrl && !loadFromStorage()) {
         // Add default financing sources
         addFinancingSource('Bank Mortgage', 'mortgage', { isAutoFillMortgage: true });
         addFinancingSource('CELIAPP', 'celiapp');
@@ -132,6 +135,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Add initial owner
         addOwner('Person 1');
+    } else if (loadedFromUrl) {
+        // URL data was saved to localStorage, now load it into UI
+        loadFromStorage();
     }
 
     // Initial calculation
@@ -360,7 +366,7 @@ function calculate() {
     const totalMovingCost = movingBase + paintTotal;
 
     // === RENOVATIONS TOTAL ===
-    const totalRenovations = renovations.reduce((sum, r) => sum + (r.amount || 0), 0);
+    const totalRenovations = renovations.filter(r => r !== null).reduce((sum, r) => sum + (r.amount || 0), 0);
 
     // === ONE-TIME COSTS TOTAL ===
     const totalOneTime = welcomeTax.totalTax + notaryFees + totalMovingCost + totalRenovations;
@@ -1711,11 +1717,11 @@ function clearStorage() {
 }
 
 // =============================================================================
-// JSON IMPORT/EXPORT FUNCTIONS
+// URL SHARING FUNCTIONS
 // =============================================================================
 
-function exportToJson() {
-    const data = {
+function getStateData() {
+    return {
         // Property pricing
         askingPrice: getInputValue('askingPrice'),
         evaluationPrice: getInputValue('evaluationPrice'),
@@ -1762,9 +1768,63 @@ function exportToJson() {
         })),
 
         // Metadata
-        exportedAt: new Date().toISOString(),
         version: '1.0'
     };
+}
+
+function getShareableUrl() {
+    const data = getStateData();
+    const compressed = LZString.compressToEncodedURIComponent(JSON.stringify(data));
+    return window.location.origin + window.location.pathname + '?data=' + compressed;
+}
+
+function copyShareUrl() {
+    const url = getShareableUrl();
+    navigator.clipboard.writeText(url).then(() => {
+        // Show brief "Copied!" feedback
+        const btn = document.getElementById('shareUrlBtn');
+        const originalText = btn.textContent;
+        btn.textContent = 'Copied!';
+        btn.classList.remove('text-purple-600', 'border-purple-300');
+        btn.classList.add('text-green-600', 'border-green-500', 'bg-green-50');
+        setTimeout(() => {
+            btn.textContent = originalText;
+            btn.classList.remove('text-green-600', 'border-green-500', 'bg-green-50');
+            btn.classList.add('text-purple-600', 'border-purple-300');
+        }, 2000);
+    }).catch(() => {
+        // Fallback for older browsers
+        prompt('Copy this URL:', url);
+    });
+}
+
+function loadFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const compressed = params.get('data');
+    if (compressed) {
+        try {
+            const json = LZString.decompressFromEncodedURIComponent(compressed);
+            const data = JSON.parse(json);
+            // Store in localStorage so it persists
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            // Clear URL params to avoid re-loading on refresh
+            history.replaceState({}, '', window.location.pathname);
+            return true;
+        } catch (err) {
+            console.error('Failed to load from URL:', err);
+            return false;
+        }
+    }
+    return false;
+}
+
+// =============================================================================
+// JSON IMPORT/EXPORT FUNCTIONS
+// =============================================================================
+
+function exportToJson() {
+    const data = getStateData();
+    data.exportedAt = new Date().toISOString();
 
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
