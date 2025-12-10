@@ -442,10 +442,21 @@ function calculate() {
         }
     });
 
-    // NOW calculate parent's loan (gap between savings and required down payment)
-    // This happens AFTER all other down payment sources have been summed
-    const downPaymentGap = Math.max(0, downPayment - totalSavingsForDownPayment);
-    updateParentsLoanAmount(downPaymentGap);
+    // NOW calculate parent's loan (gap between savings and total cash needed)
+    // Total cash needed = down payment + renovations + one-time costs
+    const totalCashNeeded = downPayment + totalRenovations + totalOneTime;
+    const cashGap = Math.max(0, totalCashNeeded - totalSavingsForDownPayment);
+    
+    // Debug logging (can be removed later)
+    console.log('Parent Loan Calculation Debug:');
+    console.log('  Down Payment:', formatCurrency(downPayment));
+    console.log('  Total Renovations:', formatCurrency(totalRenovations));
+    console.log('  Total One-Time Costs:', formatCurrency(totalOneTime));
+    console.log('  Total Cash Needed:', formatCurrency(totalCashNeeded));
+    console.log('  Available Savings:', formatCurrency(totalSavingsForDownPayment));
+    console.log('  Parent Loan Needed:', formatCurrency(cashGap));
+    
+    updateParentsLoanAmount(cashGap);
 
     // Second pass: Calculate loan payments
     let totalMonthlyLoanPayment = 0;
@@ -1867,13 +1878,25 @@ function performCalculation() {
                     totalSavingsForDownPayment += sAmount;
                 }
             });
-            const downPaymentGap = Math.max(0, downPaymentAmount - totalSavingsForDownPayment);
+            
+            // Calculate total cash needed (down payment + renovations + one-time costs)
+            const totalRenovations = renovations.filter(r => r !== null).reduce((sum, r) => sum + (r.amount || 0), 0);
+            const notaryFees = getInputValue('notaryFees');
+            const movingBase = getInputValue('movingBase');
+            const squareFootage = getInputValue('squareFootage');
+            const paintPerSqft = getInputValue('paintPerSqft');
+            const paintTotal = squareFootage * paintPerSqft;
+            const totalMovingCost = movingBase + paintTotal;
+            const welcomeTax = calculateWelcomeTax(downPaymentAmount + cmhcResult.totalMortgage).totalTax;
+            const totalOneTime = welcomeTax + notaryFees + totalMovingCost + totalRenovations;
+            const totalCashNeeded = downPaymentAmount + totalRenovations + totalOneTime;
+            const cashGap = Math.max(0, totalCashNeeded - totalSavingsForDownPayment);
 
-            if (downPaymentGap > 0) {
+            if (cashGap > 0) {
                 const rate = getInputValue(`financing-rate-${index}`);
                 const termYears = getInputValue(`financing-term-${index}`);
                 const termMonths = termYears * 12;
-                const result = calculateMonthlyPayment(downPaymentGap, rate, termMonths);
+                const result = calculateMonthlyPayment(cashGap, rate, termMonths);
                 parentsLoanPayment = result.monthlyPayment || 0;
             }
         } else if (sourceType === 'rrsp') {
